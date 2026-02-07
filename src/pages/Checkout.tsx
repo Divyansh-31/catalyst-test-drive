@@ -34,6 +34,7 @@ const Checkout = () => {
     city: '',
     state: '',
     zipCode: '',
+    phone: '',
   });
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -191,6 +192,18 @@ const Checkout = () => {
                         required
                       />
                     </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      placeholder="+91 98765 43210"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      required
+                    />
                   </div>
                 </CardContent>
               </Card>
