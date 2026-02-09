@@ -3,8 +3,10 @@ import { Order } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Clock, Package, Truck, CheckCircle, AlertTriangle, RotateCcw } from 'lucide-react';
+import { Clock, Package, Truck, CheckCircle, AlertTriangle, RotateCcw, Square } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatCurrency';
+import { startRefundPingSimulation, stopPingSimulation, isSimulationActive } from '@/services/fraudxPingService';
+import { RefundModeModal } from '@/components/RefundModeModal';
 
 interface OrderCardProps {
   order: Order;
@@ -50,6 +52,8 @@ export const OrderCard = ({ order, onRequestRefund }: OrderCardProps) => {
   const [timeRemaining, setTimeRemaining] = useState(
     order.refundWindow.expiresAt - Date.now()
   );
+  const [showModeModal, setShowModeModal] = useState(false);
+  const [simulationRunning, setSimulationRunning] = useState(() => isSimulationActive(order.id));
 
   const status = statusConfig[order.status];
   const StatusIcon = status.icon;
@@ -60,79 +64,126 @@ export const OrderCard = ({ order, onRequestRefund }: OrderCardProps) => {
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeRemaining(order.refundWindow.expiresAt - Date.now());
+      // Check simulation status periodically
+      setSimulationRunning(isSimulationActive(order.id));
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [order.refundWindow.expiresAt]);
+  }, [order.refundWindow.expiresAt, order.id]);
+
+  const handleRefundClick = () => {
+    setShowModeModal(true);
+  };
+
+  const handleModeConfirm = (mode: 'normal' | 'fast' | 'teleport') => {
+    // Start FraudX ping simulation with selected mode
+    startRefundPingSimulation(order.id, mode);
+    setSimulationRunning(true);
+    // Call the original refund handler
+    onRequestRefund(order.id);
+  };
+
+  const handleStopSimulation = () => {
+    stopPingSimulation(order.id);
+    setSimulationRunning(false);
+  };
 
   return (
-    <Card className="overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-medium">{order.id}</CardTitle>
-          <Badge className={status.color}>
-            <StatusIcon className="h-3 w-3 mr-1" />
-            {status.label}
-          </Badge>
-        </div>
-        <p className="text-xs text-muted-foreground">
-          {new Date(order.createdAt).toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Items */}
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          {order.items.map((item) => (
-            <div
-              key={item.product.id}
-              className="flex-shrink-0 h-16 w-16 rounded-lg overflow-hidden bg-muted"
-            >
-              <img
-                src={item.product.image}
-                alt={item.product.name}
-                className="h-full w-full object-cover"
-              />
-            </div>
-          ))}
-        </div>
-
-        {/* Order details */}
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
-            {order.items.length} item{order.items.length > 1 ? 's' : ''}
-          </span>
-          <span className="font-semibold">{formatCurrency(order.total)}</span>
-        </div>
-
-        {/* Refund window */}
-        <div className={`rounded-lg p-3 ${isUrgent ? 'bg-destructive/10 border border-destructive/30' : 'bg-muted/50'}`}>
+    <>
+      <Card className="overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm">
+        <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-0.5">
-                {getRefundWindowLabel(order.refundWindow.type)}
-              </p>
-              <p className={`text-sm font-medium ${isUrgent ? 'text-destructive pulse-urgent' : ''}`}>
-                {formatTimeRemaining(timeRemaining)}
-              </p>
+            <CardTitle className="text-base font-medium">{order.id}</CardTitle>
+            <div className="flex items-center gap-2">
+              {simulationRunning && (
+                <Badge className="bg-green-500/20 text-green-500 animate-pulse">
+                  📡 Sending Pings
+                </Badge>
+              )}
+              <Badge className={status.color}>
+                <StatusIcon className="h-3 w-3 mr-1" />
+                {status.label}
+              </Badge>
             </div>
-            {isRefundable && (
-              <Button
-                variant={isUrgent ? 'destructive' : 'outline'}
-                size="sm"
-                onClick={() => onRequestRefund(order.id)}
-              >
-                Request Refund
-              </Button>
-            )}
           </div>
-        </div>
-      </CardContent>
-    </Card>
+          <p className="text-xs text-muted-foreground">
+            {new Date(order.createdAt).toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Items */}
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {order.items.map((item) => (
+              <div
+                key={item.product.id}
+                className="flex-shrink-0 h-16 w-16 rounded-lg overflow-hidden bg-muted"
+              >
+                <img
+                  src={item.product.image}
+                  alt={item.product.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* Order details */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">
+              {order.items.length} item{order.items.length > 1 ? 's' : ''}
+            </span>
+            <span className="font-semibold">{formatCurrency(order.total)}</span>
+          </div>
+
+          {/* Refund window */}
+          <div className={`rounded-lg p-3 ${isUrgent ? 'bg-destructive/10 border border-destructive/30' : 'bg-muted/50'}`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground mb-0.5">
+                  {getRefundWindowLabel(order.refundWindow.type)}
+                </p>
+                <p className={`text-sm font-medium ${isUrgent ? 'text-destructive pulse-urgent' : ''}`}>
+                  {formatTimeRemaining(timeRemaining)}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                {simulationRunning && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleStopSimulation}
+                  >
+                    <Square className="h-3 w-3 mr-1 fill-current" />
+                    Stop
+                  </Button>
+                )}
+                {isRefundable && !simulationRunning && (
+                  <Button
+                    variant={isUrgent ? 'destructive' : 'outline'}
+                    size="sm"
+                    onClick={handleRefundClick}
+                  >
+                    Request Refund
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <RefundModeModal
+        open={showModeModal}
+        onOpenChange={setShowModeModal}
+        onConfirm={handleModeConfirm}
+        orderId={order.id}
+      />
+    </>
   );
 };
