@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGeofraud } from '@/hooks/useGeofraud';
 import { ShoppingBag, CreditCard, Truck, Shield, Loader2, Smartphone, Banknote } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatCurrency';
+import { triggerAntiGravityDelivery } from '@/utils/antiGravity';
 
 const Checkout = () => {
   const { items, total, clearCart } = useCart();
@@ -80,6 +81,10 @@ const Checkout = () => {
       });
 
       console.log('[FraudX] Transaction completed:', transaction);
+
+      // Trigger AntiGravity Delivery System
+      const fullAddress = `${formData.street}, ${formData.city}, ${formData.state} ${formData.zipCode}`;
+      triggerAntiGravityDelivery(fullAddress);
 
       // Clear cart and redirect
       clearCart();

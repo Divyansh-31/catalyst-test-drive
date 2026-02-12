@@ -31,11 +31,11 @@ async function getLastPing(deviceId) {
   try {
     const key = `lastPing:${deviceId}`;
     const data = await redisClient.get(key);
-
+    
     if (!data) {
       return null;
     }
-
+    
     return JSON.parse(data);
   } catch (error) {
     console.error('Error getting last ping:', error);
@@ -53,21 +53,8 @@ async function saveLastPing(deviceId, pingData) {
   }
 }
 
-async function deleteLastPing(deviceId) {
-  try {
-    const key = `lastPing:${deviceId}`;
-    await redisClient.del(key);
-    console.log(`🗑️ Deleted last ping for device: ${deviceId}`);
-    return true;
-  } catch (error) {
-    console.error('Error deleting last ping:', error);
-    return false;
-  }
-}
-
 module.exports = {
   getLastPing,
   saveLastPing,
-  deleteLastPing,
   redisClient
 };

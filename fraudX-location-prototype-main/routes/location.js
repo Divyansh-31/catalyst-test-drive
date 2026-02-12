@@ -4,7 +4,7 @@ const LocationLog = require('../models/locationLogs');
 const cityMapper = require('../utils/cityMapper');
 const haversineDistance = require("../utils/haversine");
 const { isFar, isImpossibleJump } = require("../utils/fraud");
-const { getLastPing, saveLastPing, deleteLastPing } = require('../utils/redisHelper');
+const { getLastPing, saveLastPing } = require('../utils/redisHelper');
 
 // GET /api/location - Health check
 router.get('/', (req, res) => {
@@ -38,8 +38,22 @@ router.post("/ping", async (req, res) => {
   console.log("Last ping from Redis:", lastPing);
 
   // Distance fraud check
-  if (deliveryCoords) {
-    const distanceCheck = isFar(deliveryCoords, userCoords);
+  // Use provided deliveryCoords, or auto-lookup from last saved delivery point
+  let effectiveDeliveryCoords = deliveryCoords;
+  if (!effectiveDeliveryCoords) {
+    const lastDelivery = await LocationLog.findOne({
+      deviceId,
+      fraudFlag: "DeliveryPoint"
+    }).sort({ _id: -1 });
+
+    if (lastDelivery) {
+      effectiveDeliveryCoords = { lat: lastDelivery.lat, lon: lastDelivery.lon };
+      console.log(`Auto-loaded delivery point for ${deviceId}: ${lastDelivery.lat}, ${lastDelivery.lon}`);
+    }
+  }
+
+  if (effectiveDeliveryCoords) {
+    const distanceCheck = isFar(effectiveDeliveryCoords, userCoords);
     if (distanceCheck.flag) {
       fraudTypes.push("GeoMismatch");
       riskScore = Math.max(riskScore, 0.8);
@@ -200,24 +214,6 @@ router.get("/delivery/:deviceId", async (req, res) => {
     fraudFlag: "DeliveryPoint"
   });
   res.json(log);
-});
-
-// DELETE /api/location/reset/:deviceId - Reset Redis state for a device
-router.delete("/reset/:deviceId", async (req, res) => {
-  const { deviceId } = req.params;
-
-  if (!deviceId) {
-    return res.status(400).json({ ok: false, error: "deviceId is required" });
-  }
-
-  const deleted = await deleteLastPing(deviceId);
-
-  if (deleted) {
-    console.log(`🔄 Reset Redis state for device: ${deviceId}`);
-    res.json({ ok: true, message: `Redis state cleared for ${deviceId}` });
-  } else {
-    res.status(500).json({ ok: false, error: "Failed to reset Redis state" });
-  }
 });
 
 module.exports = router;
