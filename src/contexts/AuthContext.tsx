@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { User, AuthState, OTPState, RiskMetadata } from '@/types';
 import { useGeofraud } from '@/hooks/useGeofraud';
+import { sendOTP as apiSendOTP, verifyOTP as apiVerifyOTP, OTPError } from '@/services/otpService';
 
 interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<{ success: boolean; requiresOTP: boolean }>;
@@ -45,6 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
 
   const [pendingEmail, setPendingEmail] = useState<string>('');
+  const [pendingPhone, setPendingPhone] = useState<string>('');
   const { getRiskMetadata, logTransaction } = useGeofraud();
 
   // Check for existing session
@@ -82,36 +84,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { success: false, requiresOTP: false };
   }, [logTransaction]);
 
-  const sendOTP = useCallback(async (email: string): Promise<boolean> => {
-    // Simulate sending OTP
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  const sendOTP = useCallback(async (email: string, phone?: string): Promise<boolean> => {
+    // Store phones for verify step
+    if (phone) setPendingPhone(phone);
 
-    logTransaction({
-      type: 'otp_sent',
-      email,
-      timestamp: Date.now(),
-    });
+    const mobileNumber = phone || pendingPhone;
 
-    setOtpState({
-      sent: true,
-      expiresAt: Date.now() + 60000, // 60 seconds
-      attemptsRemaining: 3,
-    });
+    try {
+      if (mobileNumber) {
+        // Send real OTP via Twilio backend
+        await apiSendOTP(mobileNumber);
+        console.log(`[OTP] SMS sent to ${mobileNumber}`);
+      } else {
+        // Fallback: no phone available (login flow without phone)
+        console.log('[OTP] No phone number available — using demo mode');
+      }
 
-    // For demo, log the OTP to console
-    console.log('[Demo] OTP Code: 123456');
+      logTransaction({
+        type: 'otp_sent',
+        email,
+        phone: mobileNumber,
+        timestamp: Date.now(),
+      });
 
-    return true;
-  }, [logTransaction]);
+      setOtpState({
+        sent: true,
+        expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes (matches backend)
+        attemptsRemaining: 3,
+      });
+
+      return true;
+    } catch (err) {
+      console.error('[OTP] Failed to send:', err);
+      return false;
+    }
+  }, [logTransaction, pendingPhone]);
 
   const verifyOTP = useCallback(async (code: string): Promise<boolean> => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
+    try {
+      if (pendingPhone) {
+        // Verify via real Twilio backend
+        await apiVerifyOTP(pendingPhone, code);
+      } else {
+        // Fallback demo mode: accept 123456
+        if (code !== '123456') throw new OTPError('Invalid OTP', 'INVALID_OTP', 400);
+      }
 
-    // For demo, accept 123456 as valid OTP
-    if (code === '123456') {
       const user: User = {
         ...mockUser,
         email: pendingEmail || mockUser.email,
+        phone: pendingPhone || undefined,
         metadata: getRiskMetadata(),
       };
 
@@ -126,22 +148,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAuthState({ user, isAuthenticated: true, isLoading: false });
       setOtpState({ sent: false, expiresAt: 0, attemptsRemaining: 3 });
       return true;
+    } catch (err) {
+      const otpErr = err instanceof OTPError ? err : null;
+      console.error('[OTP] Verification failed:', otpErr?.message || err);
+
+      setOtpState((prev) => ({
+        ...prev,
+        attemptsRemaining: prev.attemptsRemaining - 1,
+      }));
+
+      logTransaction({
+        type: 'otp_failed',
+        email: pendingEmail,
+        errorCode: otpErr?.code,
+        attemptsRemaining: otpState.attemptsRemaining - 1,
+        timestamp: Date.now(),
+      });
+
+      return false;
     }
-
-    setOtpState((prev) => ({
-      ...prev,
-      attemptsRemaining: prev.attemptsRemaining - 1,
-    }));
-
-    logTransaction({
-      type: 'otp_failed',
-      email: pendingEmail,
-      attemptsRemaining: otpState.attemptsRemaining - 1,
-      timestamp: Date.now(),
-    });
-
-    return false;
-  }, [pendingEmail, getRiskMetadata, logTransaction, otpState.attemptsRemaining]);
+  }, [pendingEmail, pendingPhone, getRiskMetadata, logTransaction, otpState.attemptsRemaining]);
 
   const logout = useCallback(() => {
     logTransaction({

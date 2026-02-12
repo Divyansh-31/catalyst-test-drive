@@ -58,41 +58,37 @@ const Checkout = () => {
     setIsProcessing(false);
   };
 
-  const handleOTPVerify = async (code: string): Promise<boolean> => {
-    // Simulate verification
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  const handleOTPVerify = async (_code: string): Promise<boolean> => {
+    // OTP has already been verified by the modal against the Twilio backend.
+    // This callback handles post-verification logic (FraudX + navigation).
 
-    if (code === '123456') {
-      // Log successful transaction to FraudX
-      const transaction = logTransaction({
-        type: 'purchase',
-        orderId: `ORD-${Date.now()}`,
-        amount: total,
-        paymentMethod,
-        items: items.map((i) => ({
-          productId: i.product.id,
-          name: i.product.name,
-          quantity: i.quantity,
-          price: i.product.price,
-          category: i.product.category,
-        })),
-        riskMetadata: getRiskMetadata(),
-        timestamp: Date.now(),
-      });
+    // Log successful transaction to FraudX
+    const transaction = logTransaction({
+      type: 'purchase',
+      orderId: `ORD-${Date.now()}`,
+      amount: total,
+      paymentMethod,
+      items: items.map((i) => ({
+        productId: i.product.id,
+        name: i.product.name,
+        quantity: i.quantity,
+        price: i.product.price,
+        category: i.product.category,
+      })),
+      riskMetadata: getRiskMetadata(),
+      timestamp: Date.now(),
+    });
 
-      console.log('[FraudX] Transaction completed:', transaction);
+    console.log('[FraudX] Transaction completed:', transaction);
 
-      // Trigger AntiGravity Delivery System
-      const fullAddress = `${formData.street}, ${formData.city}, ${formData.state} ${formData.zipCode}`;
-      triggerAntiGravityDelivery(fullAddress);
+    // Trigger AntiGravity Delivery System
+    const fullAddress = `${formData.street}, ${formData.city}, ${formData.state} ${formData.zipCode}`;
+    triggerAntiGravityDelivery(fullAddress);
 
-      // Clear cart and redirect
-      clearCart();
-      navigate('/dashboard/orders?success=true');
-      return true;
-    }
-
-    return false;
+    // Clear cart and redirect
+    clearCart();
+    navigate('/dashboard/orders?success=true');
+    return true;
   };
 
   // Calculate tax (18% GST for India)
@@ -128,6 +124,7 @@ const Checkout = () => {
         onOpenChange={setShowOTPModal}
         onVerify={handleOTPVerify}
         amount={grandTotal}
+        phone={formData.phone}
       />
 
       <div className="container py-8">
