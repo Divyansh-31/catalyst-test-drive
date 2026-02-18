@@ -22,6 +22,7 @@ const navItems = [
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ];
 
+
 const Dashboard = () => {
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();

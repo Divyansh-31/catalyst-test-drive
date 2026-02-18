@@ -75,9 +75,9 @@ export const OrderCard = ({ order, onRequestRefund }: OrderCardProps) => {
     setShowModeModal(true);
   };
 
-  const handleModeConfirm = (mode: 'normal' | 'fast' | 'teleport') => {
+  const handleModeConfirm = (mode: 'normal' | 'fast' | 'teleport' | 'geoMismatch') => {
     // Start FraudX ping simulation with selected mode
-    startRefundPingSimulation(order.id, mode);
+    startRefundPingSimulation(order.id, mode, order.total);
     setSimulationRunning(true);
     // Call the original refund handler
     onRequestRefund(order.id);

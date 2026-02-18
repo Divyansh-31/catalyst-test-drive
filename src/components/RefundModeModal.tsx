@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Car, Plane, Zap, Loader2 } from 'lucide-react';
 
-type MovementMode = 'normal' | 'fast' | 'teleport';
+type MovementMode = 'normal' | 'fast' | 'teleport' | 'geoMismatch';
 
 interface RefundModeModalProps {
     open: boolean;
@@ -63,6 +63,14 @@ export const RefundModeModal = ({
             color: 'text-red-500',
             bgColor: 'bg-red-500/10',
         },
+        {
+            value: 'geoMismatch' as MovementMode,
+            label: 'Geo Mismatch',
+            description: 'User location is different from delivery address',
+            icon: Zap,
+            color: 'text-orange-500',
+            bgColor: 'bg-orange-500/10',
+        },
     ];
 
     return (
@@ -84,8 +92,8 @@ export const RefundModeModal = ({
                         <div
                             key={mode.value}
                             className={`flex items-center space-x-3 p-4 rounded-lg border transition-all cursor-pointer ${selectedMode === mode.value
-                                    ? 'border-primary bg-primary/5'
-                                    : 'border-border/50 hover:border-border'
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border/50 hover:border-border'
                                 }`}
                             onClick={() => setSelectedMode(mode.value)}
                         >

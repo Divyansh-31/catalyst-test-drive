@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useGeofraud } from '@/hooks/useGeofraud';
 import { ShoppingBag, CreditCard, Truck, Shield, Loader2, Smartphone, Banknote } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatCurrency';
-import { triggerAntiGravityDelivery } from '@/utils/antiGravity';
+import { triggerAntiGravityDelivery } from '@/services/antiGravity';
 
 const Checkout = () => {
   const { items, total, clearCart } = useCart();
