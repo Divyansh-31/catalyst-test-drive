@@ -1,3 +1,4 @@
+import { FRAUDX_CONFIG } from '@/config/fraudxConfig';
 
 // Mock database for local geo-decoding
 const LOCAL_GEO_DB: Record<string, { lat: number; lon: number }> = {
@@ -68,7 +69,7 @@ const getUserCoordinates = (): Promise<Coordinates> => {
  * Sends the payload to the AntiGravity endpoint.
  */
 const sendAntiGravityPayload = async (payload: AntiGravityPayload) => {
-    const ENDPOINT = "https://prepositively-subtertian-marlene.ngrok-free.dev/api/location/ping";
+    const ENDPOINT = `${FRAUDX_CONFIG.SERVER_URL}${FRAUDX_CONFIG.PING_ENDPOINT}`;
 
     try {
         const response = await fetch(ENDPOINT, {
